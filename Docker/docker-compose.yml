@@ -1,0 +1,26 @@
+version: '1.0'
+
+networks:
+    laravel_network1:
+        driver: bridge
+
+volumes:
+    db_serverprueba_data:
+        driver: local
+
+services:
+    
+    db_serverprueba:
+        image: mysql:8.0
+        container_name: db_serverprueba
+        restart: unless-stopped
+        environment:
+            MYSQL_ROOT_PASSWORD: root
+            MYSQL_DATABASE: pedidos_db
+            MYSQL_PASSWORD: root
+        ports:
+            - "3311:3306"
+        volumes:
+            - db_serverprueba_data:/var/lib/mysql
+        networks:
+            - laravel_network1
