@@ -1,10 +1,9 @@
-DROP DATABASE IF EXISTS postgrado_usfx;
 
-CREATE DATABASE postgrado_usfx
+CREATE DATABASE posgrado_usfx_access
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
 
-USE postgrado_usfx;
+USE posgrado_usfx_access;
 
 CREATE TABLE roles (
     id_rol INT AUTO_INCREMENT PRIMARY KEY,
@@ -23,13 +22,10 @@ CREATE TABLE usuarios (
         REFERENCES roles(id_rol)
 );
 
-
--- TIPOS DE POSTGRADO (Diplomado, Especialidad, Maestría)
 CREATE TABLE tipos (
     id_tipo INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL UNIQUE
 );
-
 
 CREATE TABLE programas (
     id_programa INT AUTO_INCREMENT PRIMARY KEY,
@@ -44,21 +40,16 @@ CREATE TABLE programas (
         UNIQUE (id_tipo, nombre)
 );
 
--- Conceptos: Matrícula, Colegiatura, Tutoría, Publicación
 CREATE TABLE conceptos (
     id_concepto INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL UNIQUE
 );
-
-
--- Tipo de Persona: Externo, USFX, Docente, Administrativo, Extranjero, Persona con discapacidad
 
 CREATE TABLE tipo_persona (
     id_tipo_persona INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL UNIQUE
 );
 
--- Descuentos: USFX + Colegiatura = 20%, USFX + Tutoría     = 10% Ejm Discapacidad + Colegiatura = 50%
 CREATE TABLE descuentos_tipo_persona (
     id_descuento INT AUTO_INCREMENT PRIMARY KEY,
     id_tipo_persona INT NOT NULL,
@@ -74,22 +65,18 @@ CREATE TABLE descuentos_tipo_persona (
         REFERENCES conceptos(id_concepto),
 
     CONSTRAINT chk_porcentaje_descuento
-        CHECK (porcentaje_descuento >= 0
-               AND porcentaje_descuento <= 100),
+        CHECK (porcentaje_descuento >= 0 AND porcentaje_descuento <= 100),
 
     CONSTRAINT uq_descuento_tipo_concepto
         UNIQUE (id_tipo_persona, id_concepto)
 );
-
--- Esta es nuestra tabla de presupuesto
--- Por ejemplo: Ciencia de Datos: Matrícula  500, Colegiatura    3000, Tutoría   500
 
 CREATE TABLE programas_conceptos (
     id_pc INT AUTO_INCREMENT PRIMARY KEY,
     id_programa INT NOT NULL,
     id_concepto INT NOT NULL,
     monto_base DECIMAL(10,2) NOT NULL,
-    desglose BOOLEAN NOT NULL DEFAULT FALSE,
+    desglose TINYINT(1) NOT NULL DEFAULT 0,
     cantidad_pagos INT NOT NULL DEFAULT 1,
 
     CONSTRAINT fk_pc_programa
@@ -109,7 +96,6 @@ CREATE TABLE programas_conceptos (
     CONSTRAINT uq_programa_concepto
         UNIQUE (id_programa, id_concepto)
 );
-
 
 CREATE TABLE grupos (
     id_grupo INT AUTO_INCREMENT PRIMARY KEY,
@@ -137,14 +123,13 @@ CREATE TABLE personas (
         REFERENCES tipo_persona(id_tipo_persona)
 );
 
--- Esta es la inscripción:
 CREATE TABLE personas_programas (
     id_persona_programa INT AUTO_INCREMENT PRIMARY KEY,
     id_persona INT NOT NULL,
+    id_programa INT NOT NULL,
     id_grupo INT NOT NULL,
     fecha_inscripcion DATE NOT NULL,
-    estado ENUM('ACTIVA', 'RETIRADA', 'FINALIZADA')
-           NOT NULL DEFAULT 'ACTIVA',
+    estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVA',
 
     CONSTRAINT fk_pp_persona
         FOREIGN KEY (id_persona)
@@ -156,9 +141,11 @@ CREATE TABLE personas_programas (
 
     CONSTRAINT fk_pp_grupo
         FOREIGN KEY (id_grupo)
-        REFERENCES grupos(id_grupo)
-);
+        REFERENCES grupos(id_grupo),
 
+    CONSTRAINT chk_pp_estado
+        CHECK (estado IN ('ACTIVA', 'RETIRADA', 'FINALIZADA'))
+);
 
 CREATE TABLE plan_pagos (
     id_plan INT AUTO_INCREMENT PRIMARY KEY,
@@ -167,8 +154,7 @@ CREATE TABLE plan_pagos (
     monto_total DECIMAL(10,2) NOT NULL,
     cantidad_cuotas INT NOT NULL DEFAULT 1,
     fecha_inicio DATE NOT NULL,
-    estado ENUM('ACTIVO', 'FINALIZADO', 'CANCELADO')
-           NOT NULL DEFAULT 'ACTIVO',
+    estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVO',
 
     CONSTRAINT fk_plan_persona_programa
         FOREIGN KEY (id_persona_programa)
@@ -182,13 +168,11 @@ CREATE TABLE plan_pagos (
         CHECK (monto_total >= 0),
 
     CONSTRAINT chk_plan_cuotas
-        CHECK (cantidad_cuotas >= 1)
-        -- Evita duplicar el plan del mismo concepto para el mismo alumno
-    CONSTRAINT uq_plan_persona_pc
-        UNIQUE (id_persona_programa, id_pc)
+        CHECK (cantidad_cuotas >= 1),
+
+    CONSTRAINT chk_plan_estado
+        CHECK (estado IN ('ACTIVO', 'FINALIZADO', 'CANCELADO'))
 );
-
-
 
 CREATE TABLE cuotas (
     id_cuota INT AUTO_INCREMENT PRIMARY KEY,
@@ -196,8 +180,7 @@ CREATE TABLE cuotas (
     numero_cuota INT NOT NULL,
     fecha_vencimiento DATE NOT NULL,
     monto_cuota DECIMAL(10,2) NOT NULL,
-    estado_pago ENUM('PENDIENTE', 'PAGADA', 'VENCIDA', 'ANULADA')
-                NOT NULL DEFAULT 'PENDIENTE',
+    estado_pago VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
 
     CONSTRAINT fk_cuota_plan
         FOREIGN KEY (id_plan)
@@ -210,7 +193,10 @@ CREATE TABLE cuotas (
         CHECK (monto_cuota >= 0),
 
     CONSTRAINT uq_plan_numero_cuota
-        UNIQUE (id_plan, numero_cuota)
+        UNIQUE (id_plan, numero_cuota),
+
+    CONSTRAINT chk_cuota_estado
+        CHECK (estado_pago IN ('PENDIENTE', 'PAGADA', 'VENCIDA', 'ANULADA'))
 );
 
 CREATE TABLE transacciones (
@@ -222,8 +208,7 @@ CREATE TABLE transacciones (
     fecha_emision DATE NOT NULL,
     fecha_transaccion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     monto_total DECIMAL(10,2) NOT NULL,
-    estado ENUM('REGISTRADA', 'ANULADA')
-            NOT NULL DEFAULT 'REGISTRADA',
+    estado VARCHAR(20) NOT NULL DEFAULT 'REGISTRADA',
 
     CONSTRAINT fk_transaccion_persona_programa
         FOREIGN KEY (id_persona_programa)
@@ -234,7 +219,10 @@ CREATE TABLE transacciones (
         REFERENCES usuarios(id_usuario),
 
     CONSTRAINT chk_transaccion_monto
-        CHECK (monto_total >= 0)
+        CHECK (monto_total >= 0),
+
+    CONSTRAINT chk_transaccion_estado
+        CHECK (estado IN ('REGISTRADA', 'ANULADA'))
 );
 
 CREATE TABLE detalle_transaccion (
@@ -243,14 +231,13 @@ CREATE TABLE detalle_transaccion (
     id_concepto INT NOT NULL,
     id_cuota INT NULL,
     detalle_concepto VARCHAR(200),
-    cantidad INT NOT NULL DEFAULT 1,
+    cantidad DECIMAL(10,2) NOT NULL DEFAULT 1,
     precio_unit DECIMAL(10,2) NOT NULL,
     subtotal DECIMAL(10,2) NOT NULL,
 
     CONSTRAINT fk_detalle_transaccion
         FOREIGN KEY (id_transaccion)
-        REFERENCES transacciones(id_transaccion) 
-        ON DELETE CASCADE,
+        REFERENCES transacciones(id_transaccion),
 
     CONSTRAINT fk_detalle_concepto
         FOREIGN KEY (id_concepto)
@@ -269,3 +256,9 @@ CREATE TABLE detalle_transaccion (
     CONSTRAINT chk_detalle_subtotal
         CHECK (subtotal >= 0)
 );
+
+USE posgrado_usfx_access;
+
+-- Modificamos la columna subtotal para que sea autocalculada por MySQL
+ALTER TABLE detalle_transaccion 
+MODIFY COLUMN subtotal DECIMAL(10,2) GENERATED ALWAYS AS (cantidad * precio_unit) STORED;
